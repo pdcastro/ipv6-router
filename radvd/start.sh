@@ -32,16 +32,16 @@ function setup_routing {
 function setup_firewall {
 	ip6tables -N IPV6-ROUTER-FWD
 	ip6tables -F IPV6-ROUTER-FWD
+	ip6tables -A IPV6-ROUTER-FWD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 	ip6tables -A IPV6-ROUTER-FWD -s "${ROUTED_PREFIX}" -j ACCEPT
-	ip6tables -A IPV6-ROUTER-FWD -d "${ROUTED_PREFIX}" -j ACCEPT
 	ip6tables -A IPV6-ROUTER-FWD -j REJECT --reject-with icmp6-adm-prohibited
 
 	ip6tables -N IPV6-ROUTER-IN
 	ip6tables -F IPV6-ROUTER-IN
-	# Do we need to accept ICMPv6 from the whole world? All types? Security?
+	ip6tables -A IPV6-ROUTER-IN -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 	ip6tables -A IPV6-ROUTER-IN -s fe80::/64 -p ipv6-icmp -j ACCEPT
-	ip6tables -A IPV6-ROUTER-IN -s "${TUNNEL_PREFIX}" -p ipv6-icmp -j ACCEPT
 	ip6tables -A IPV6-ROUTER-IN -s "${ROUTED_PREFIX}" -p ipv6-icmp -j ACCEPT
+	ip6tables -A IPV6-ROUTER-IN -s "${TUNNEL_PREFIX}" -p ipv6-icmp -j ACCEPT
 	ip6tables -A IPV6-ROUTER-IN -j REJECT --reject-with icmp6-adm-prohibited
 
 	ip6tables -D INPUT   -j IPV6-ROUTER-IN
