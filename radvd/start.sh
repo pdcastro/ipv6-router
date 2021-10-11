@@ -1,22 +1,31 @@
 #!/bin/bash
 
-ROUTER_INTERFACE='eth0'
-ROUTED_PREFIX='2001:470:1f1d:1dc::/64'
-TUNNEL_PREFIX='2001:470:1f1c:1dd::/64'
+ROUTER_INTERFACE='eth0' # Device's physical interface on the local network (eth0=ethernet, wlan0=WiFi typically)
+ROUTED_PREFIX='2001:1122:ABCD:BABA::/64' # Tunnel's "routed prefix", to be advertised to the local network
+TUNNEL_PREFIX='2001:470:1f1c:1dd::/64' # Tunnel's own subnet, from which ::1 (gateway) and ::2 (client) are derived
 TUNNEL_REMOTE_GW="${TUNNEL_PREFIX/::\/*/::1}"
 TUNNEL_LOCAL_IP6="${TUNNEL_PREFIX/::\//::2\/}"
-TUNNEL_REMOTE_IP4='216.66.88.98'
-TUNNEL_LOCAL_IP4='192.168.1.86'
+TUNNEL_REMOTE_IP4='216.66.88.90' # Tunnel's public IPv4, remote endpoint (Hurricane Electric)
+TUNNEL_LOCAL_IP4='192.168.0.44' # Device's private IPv4 address on the local network
+# MTU depends on the IPv4 ISP. Vodafone UK needed 1472. We should implement auto detection.
+# The MTU also needs to be configured in the Hurricane Electric web interface.
+TUNNEL_MTU='1472'
 
 function setup_6in4_tunnel {
 	DBUS_SYSTEM_BUS_ADDRESS=unix:path=/host/run/dbus/system_bus_socket \
 		nmcli connection add \
 			con-name he-sit ifname he-sit \
-			type ip-tunnel mode sit \
+			type ip-tunnel mode sit mtu "${TUNNEL_MTU}" \
 			remote "${TUNNEL_REMOTE_IP4}" local "${TUNNEL_LOCAL_IP4}" -- \
 			ipv4.method disabled ipv6.method manual \
 			ipv6.gateway "${TUNNEL_REMOTE_GW}" \
 			ipv6.address "${TUNNEL_LOCAL_IP6}"
+
+	# I found that the nmcli command above was not respecting the mtu parameter (why?),
+	# hence adding this unreliable `ip link set` workaround. Can we make NetworkManager
+	# respect it through some config file or another `nmcli` command?
+	# `nmcli dev modify he-sit mtu 1472` did not work either, why not? Needs down/up?
+	sleep 2 && ip link set he-sit mtu 1472
 }
 
 function del_6in4_tunnel {
